@@ -71,11 +71,6 @@ async function run() {
 
     // Enhanced Student Endpoints for your data structure
 
-    /**
-     * @api {get} /students Get all students with advanced filtering
-     * @apiName GetStudents
-     * @apiGroup Students
-     */
     app.get('/students', async (req, res) => {
       try {
         const {
@@ -207,6 +202,101 @@ async function run() {
       }
     });
 
+    // Get Single Student
+    app.get('/students/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const student = await studentCollection.findOne({ _id: new ObjectId(id) });
+        if (!student) {
+          return res.status(404).json({
+            success: false,
+            message: 'Student not found',
+          });
+        }
+        res.status(200).json({
+          success: true,
+          data: student,
+        });
+      } catch (error) {
+        console.error('Error fetching student:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch student',
+          error: error.message,
+        });
+      }
+    });
+
+    
+    // Update Student
+    app.put('/students/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const updatedData = req.body;
+
+        // First get the existing student data
+        const existingStudent = await studentCollection.findOne({ _id: new ObjectId(id) });
+
+        if (!existingStudent) {
+          return res.status(404).json({
+            success: false,
+            message: 'Student not found',
+          });
+        }
+
+        // Check if roll or class is being updated
+        const isRollChanging = updatedData.roll && updatedData.roll !== existingStudent.roll;
+        const isClassChanging =
+          updatedData.dclassName && updatedData.dclassName !== existingStudent.dclassName;
+
+        // If either roll or class is being changed, check for duplicates
+        if (isRollChanging || isClassChanging) {
+          const newRoll = updatedData.roll || existingStudent.roll;
+          const newClass = updatedData.dclassName || existingStudent.dclassName;
+
+          const duplicateStudent = await studentCollection.findOne({
+            _id: { $ne: new ObjectId(id) }, // Exclude current student
+            roll: newRoll,
+            dclassName: newClass,
+          });
+
+          if (duplicateStudent) {
+            return res.status(400).json({
+              success: false,
+              message: 'Another student already has this roll number in the same class',
+            });
+          }
+        }
+
+        // Merge existing data with updated data
+        const finalData = {
+          ...existingStudent,
+          ...updatedData,
+          updatedAt: new Date(), // Add update timestamp
+        };
+
+        // Remove the _id field to prevent modification
+        delete finalData._id;
+
+        const result = await studentCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: finalData }
+        );
+
+        res.status(200).json({
+          success: true,
+          message: 'Student updated successfully',
+          data: finalData,
+        });
+      } catch (error) {
+        console.error('Error updating student:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to update student',
+          error: error.message,
+        });
+      }
+    });
     //=================================================================================================================
 
     console.log('Pinged your deployment. You successfully connected to MongoDB!');
