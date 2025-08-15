@@ -227,7 +227,6 @@ async function run() {
       }
     });
 
-    
     // Update Student
     app.put('/students/:id', async (req, res) => {
       try {
@@ -297,6 +296,44 @@ async function run() {
         });
       }
     });
+    //=================================================================================================================
+
+    // POST endpoint to save student marks
+    // Post Marks in Database
+    app.post('/marks', async (req, res) => {
+      const { examType, classesName, roll } = req.body;
+
+      try {
+        // Check if marks for same student, class & exam already exists
+        const marksExists = await marksCollection.findOne({
+          examType: examType,
+          classesName: classesName,
+          roll: roll,
+        });
+
+        if (marksExists) {
+          return res.status(400).send({
+            message: 'This Student already has marks for this class and exam',
+            inserted: false,
+          });
+        }
+
+        // Insert marks if not exists
+        const result = await marksCollection.insertOne(req.body);
+        res.send({
+          message: 'Marks inserted successfully',
+          inserted: true,
+          result,
+        });
+      } catch (error) {
+        console.error('Error inserting marks:', error);
+        res.status(500).send({
+          message: 'Internal server error',
+          inserted: false,
+        });
+      }
+    });
+
     //=================================================================================================================
 
     console.log('Pinged your deployment. You successfully connected to MongoDB!');
