@@ -12,46 +12,37 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB Client
-const client = new MongoClient(process.env.DB_URI, {
+// MongoDB Connection
+const uri = process.env.DB_URI;
+if (!uri) {
+  console.error(
+    "MongoDB URI is not set. Please set the DB_URI environment variable."
+  );
+  process.exit(1);
+}
+
+const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
   },
 });
-
-let db;
-
-// Connect to MongoDB
-async function connectDB() {
-  try {
-    await client.connect();
-    db = client.db('school'); // বা তুমি চাইলে অন্য DB name দিতে পারো
-    console.log('MongoDB connected successfully');
-  } catch (err) {
-    console.error('MongoDB connection failed:', err);
-    process.exit(1);
-  }
+async function run() {
+    try {
+        await client.connect();
+        await client.db('admin').command({ ping: 1 });
+        console.log('Pinged your deployment. You successfully connected to MongoDB!');
+    } finally {
+        await client.close();
+    }
 }
+run().catch(console.dir);
 
-// Call connectDB to establish connection before routes
-connectDB();
-
-// Routes
 app.get('/', (req, res) => {
-  res.send('Express server with CORS and MongoDB');
+  res.send('School Server is running!');
 });
 
-app.get('/items', async (req, res) => {
-  try {
-    const items = await db.collection('items').find().toArray();
-    res.json(items);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch items' });
-  }
-});
-
-// Start server
 app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+  // console.log(`School Server is listening on port ${port}`);
+}); 
