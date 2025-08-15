@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion,ObjectId } = require('mongodb');
 
 dotenv.config();
 const app = express();
@@ -47,12 +47,12 @@ async function run() {
 
     // Post Student in Database
     app.post('/students', async (req, res) => {
-      const { roll, className } = req.body;
+      const { roll, dclassName } = req.body;
 
       // Check if student with same roll and class already exists
       const userExists = await studentCollection.findOne({
         roll: roll,
-        className: className,
+        dclassName: dclassName,
       });
 
       if (userExists) {
@@ -65,6 +65,146 @@ async function run() {
       const user = req.body;
       const result = await studentCollection.insertOne(user);
       res.send(result);
+    });
+
+    // ===============================================================================================
+
+    // Enhanced Student Endpoints for your data structure
+
+    /**
+     * @api {get} /students Get all students with advanced filtering
+     * @apiName GetStudents
+     * @apiGroup Students
+     */
+    app.get('/students', async (req, res) => {
+      try {
+        const {
+          class: className,
+          section,
+          roll,
+          search,
+          status,
+          gender,
+          religion,
+          bloodGroup,
+          sort = 'dclassName,roll',
+          page = 1,
+          limit = 10,
+        } = req.query;
+
+        // Build filter object
+        const filter = {};
+
+        // Exact match filters
+        if (className) filter.dclassName = className;
+        if (section) filter.section = section;
+        if (roll) filter.roll = roll.toString();
+        if (status) filter.status = status;
+        if (gender) filter.gender = gender;
+        if (religion) filter.religion = religion;
+        if (bloodGroup) filter.bloodGroup = bloodGroup;
+
+        // Search across multiple fields
+        if (search) {
+          filter.$or = [
+            { name: { $regex: search, $options: 'i' } },
+            { roll: { $regex: search, $options: 'i' } },
+            { fatherName: { $regex: search, $options: 'i' } },
+            { motherName: { $regex: search, $options: 'i' } },
+            { village: { $regex: search, $options: 'i' } },
+            { upazila: { $regex: search, $options: 'i' } },
+            { district: { $regex: search, $options: 'i' } },
+          ];
+        }
+
+        // Sorting
+        const sortOptions = sort.split(',').map((field) => {
+          const [key, order] = field.startsWith('-') ? [field.substring(1), -1] : [field, 1];
+          return [key, order];
+        });
+
+        const sortCriteria = {};
+        sortOptions.forEach(([key, order]) => {
+          sortCriteria[key] = order;
+        });
+
+        // Pagination
+        const pageNumber = parseInt(page);
+        const limitNumber = parseInt(limit);
+        const skip = (pageNumber - 1) * limitNumber;
+
+        // Get total count for pagination
+        const total = await studentCollection.countDocuments(filter);
+
+        // Execute query
+        const students = await studentCollection
+          .find(filter)
+          .sort(sortCriteria)
+          .skip(skip)
+          .limit(limitNumber)
+          .toArray();
+
+        res.status(200).json({
+          success: true,
+          count: students.length,
+          total,
+          page: pageNumber,
+          pages: Math.ceil(total / limitNumber),
+          data: students.map((student) => ({
+            id: student._id,
+            name: student.name,
+            gender: student.gender,
+            dob: student.dob,
+            bloodGroup: student.bloodGroup,
+            religion: student.religion,
+            dclassName: student.dclassName,
+            roll: student.roll,
+            section: student.section,
+            admissionDate: student.admissionDate,
+            fatherName: student.fatherName,
+            motherName: student.motherName,
+            parentContact: student.parentContact,
+            image: student.image || '/default-avatar.png',
+            status: student.status,
+            createdAt: student.createdAt,
+          })),
+        });
+      } catch (error) {
+        console.error('Error fetching students:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch students',
+          error: error.message,
+        });
+      }
+    });
+
+    // Delete Student
+    app.delete('/students/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const result = await studentCollection.deleteOne({ _id: new ObjectId(id) });
+
+        if (result.deletedCount === 0) {
+          return res.status(404).json({
+            success: false,
+            message: 'Student not found',
+          });
+        }
+
+        res.status(200).json({
+          success: true,
+          message: 'Student deleted successfully',
+          data: result,
+        });
+      } catch (error) {
+        console.error('Error deleting student:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to delete student',
+          error: error.message,
+        });
+      }
     });
 
     //=================================================================================================================
