@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const { MongoClient, ServerApiVersion,ObjectId } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 dotenv.config();
 const app = express();
@@ -69,8 +69,7 @@ async function run() {
 
     // ===============================================================================================
 
-    // Enhanced Student Endpoints for your data structure
-
+    // ================================================================================================ Student Operation start>>
     app.get('/students', async (req, res) => {
       try {
         const {
@@ -296,9 +295,14 @@ async function run() {
         });
       }
     });
-    //=================================================================================================================
+    // ================================================================================================ Student Operation End>>>
 
-    // POST endpoint to save student marks
+    //==>
+    //==>
+    //==>
+
+    // ================================================================================================ Marks Operation Start>>>
+
     // Post Marks in Database
     app.post('/marks', async (req, res) => {
       const { examType, classesName, roll } = req.body;
@@ -334,7 +338,6 @@ async function run() {
       }
     });
 
-    // Get marks with filters
     // Get Marks in Database
     app.get('/marks', async (req, res) => {
       try {
@@ -375,6 +378,34 @@ async function run() {
         res.status(500).send({ success: false, message: 'Internal server error' });
       }
     });
+
+    // Update marks by ID
+    app.put('/marks/:id', async (req, res) => {
+      const { id } = req.params;
+      const updated = req.body;
+      const result = await marksCollection.updateOne({ _id: new ObjectId(id) }, { $set: updated });
+      if (result.modifiedCount === 0) return res.status(400).json({ message: 'Update failed' });
+      res.json({ message: 'Marks updated successfully' });
+    });
+
+    // Get mark by ID
+    app.get('/marks/:id', async (req, res) => {
+      const { id } = req.params;
+
+      try {
+        const marks = await marksCollection.findOne({ _id: new ObjectId(id) });
+
+        if (!marks) {
+          return res.status(404).send({ message: 'Mark not found' });
+        }
+
+        res.send(marks);
+      } catch (error) {
+        console.error('Error fetching mark:', error);
+        res.status(500).send({ message: 'Internal server error' });
+      }
+    });
+    // ===================================================================================================== Marks Operation End>>>
 
     //=================================================================================================================
 
