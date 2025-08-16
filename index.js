@@ -334,6 +334,48 @@ async function run() {
       }
     });
 
+    // Get marks with filters
+    // Get Marks in Database
+    app.get('/marks', async (req, res) => {
+      try {
+        const { examType, examYear, classesName, roll } = req.query;
+
+        const filter = {};
+        if (examType) filter.examType = examType;
+        if (examYear) filter.examYear = examYear;
+        if (classesName) filter.classesName = classesName;
+        if (roll) filter.roll = roll;
+
+        const result = await marksCollection.find(filter).toArray();
+
+        res.send(result);
+      } catch (error) {
+        console.error('Error fetching marks:', error);
+        res.status(500).send({
+          message: 'Internal server error',
+        });
+      }
+    });
+
+    // DELETE Marks by ID
+    app.delete('/marks/:id', async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+
+        const result = await marksCollection.deleteOne(query);
+
+        if (result.deletedCount === 1) {
+          res.send({ success: true, message: 'Marks deleted successfully' });
+        } else {
+          res.status(404).send({ success: false, message: 'Marks not found' });
+        }
+      } catch (error) {
+        console.error('Error deleting marks:', error);
+        res.status(500).send({ success: false, message: 'Internal server error' });
+      }
+    });
+
     //=================================================================================================================
 
     console.log('Pinged your deployment. You successfully connected to MongoDB!');
