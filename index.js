@@ -45,6 +45,9 @@ async function run() {
 
     //=================================================================================================================
 
+    // ===============================================================================================
+
+    // ================================================================================================ Student Operation start>>
     // Post Student in Database
     app.post('/students', async (req, res) => {
       const { roll, dclassName } = req.body;
@@ -67,9 +70,6 @@ async function run() {
       res.send(result);
     });
 
-    // ===============================================================================================
-
-    // ================================================================================================ Student Operation start>>
     app.get('/students', async (req, res) => {
       try {
         const {
@@ -405,7 +405,150 @@ async function run() {
         res.status(500).send({ message: 'Internal server error' });
       }
     });
-    // ===================================================================================================== Marks Operation End>>>
+    // ================================================================================================ Marks Operation End>>>
+    // ==>
+    // ==>
+    // ==>
+    // ==>
+    // ================================================================================================ Teacher Operation Start>>>
+    // Post Teacher in Database
+    app.post('/teachers', async (req, res) => {
+      const { indexno } = req.body;
+
+      // Check if teacher with same indexx already exists
+      const userExists = await staffCollection.findOne({
+        indexno: indexno,
+      });
+
+      if (userExists) {
+        return res.status(400).send({
+          message: 'Teacher with this index  already exists',
+          inserted: false,
+        });
+      }
+
+      const user = req.body;
+      const result = await staffCollection.insertOne(user);
+      res.send(result);
+    });
+
+    // Get Teachers in Database
+    app.get('/teachers', async (req, res) => {
+      try {
+        const { page = 1, limit = 10 } = req.query;
+
+        const pageNumber = parseInt(page);
+        const limitNumber = parseInt(limit);
+        const skip = (pageNumber - 1) * limitNumber;
+
+        // Get total count for pagination
+        const total = await staffCollection.countDocuments();
+
+        // Fetch teachers with pagination
+        const teachers = await staffCollection
+          .find({})
+          .sort({ dclassName: 1, roll: 1 }) // Default sorting
+          .skip(skip)
+          .limit(limitNumber)
+          .toArray();
+
+        res.status(200).json({
+          success: true,
+          total,
+          page: pageNumber,
+          pages: Math.ceil(total / limitNumber),
+          data: teachers.map((teacher) => ({
+            id: teacher._id,
+            fullName: teacher.fullName,
+            designation: teacher.designation || '-',
+            indexno: teacher.indexno,
+            gender: teacher.gender,
+            phone: teacher.phone || '-',
+            image: teacher.image || '/default-avatar.png',
+          })),
+        });
+      } catch (error) {
+        console.error('Error fetching teachers:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch teachers',
+          error: error.message,
+        });
+      }
+    });
+
+    // Get Single Teacher
+    app.get('/teachers/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const teacher = await staffCollection.findOne({ _id: new ObjectId(id) });
+
+        if (!teacher) {
+          return res.status(404).json({
+            success: false,
+            message: 'Teacher not found',
+          });
+        }
+
+        res.status(200).json({
+          success: true,
+          data: teacher,
+        });
+      } catch (error) {
+        console.error('Error fetching teacher:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch teacher',
+          error: error.message,
+        });
+      }
+    });
+
+    // Update Teacher
+    app.put('/teachers/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const updatedData = req.body;
+
+        // First get the existing teacher data
+        const existingTeacher = await staffCollection.findOne({ _id: new ObjectId(id) });
+
+        if (!existingTeacher) {
+          return res.status(404).json({
+            success: false,
+            message: 'Teacher not found',
+          });
+        }
+
+        // Merge existing data with updated data
+        const finalData = {
+          ...existingTeacher,
+          ...updatedData,
+          updatedAt: new Date(), // Add update timestamp
+        };
+
+        // Remove the _id field to prevent modification
+        delete finalData._id;
+
+        const result = await staffCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: finalData }
+        );
+
+        res.status(200).json({
+          success: true,
+          message: 'Teacher updated successfully',
+          data: finalData,
+        });
+      } catch (error) {
+        console.error('Error updating teacher:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to update teacher',
+          error: error.message,
+        });
+      }
+    });
 
     //=================================================================================================================
 
