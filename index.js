@@ -29,8 +29,8 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
-    await client.db('admin').command({ ping: 1 });
+    // await client.connect();
+    // await client.db('admin').command({ ping: 1 });
     const db = client.db('ChenchriGirls'); // Connect to the ChenchriGirls database
     const studentCollection = db.collection('students'); // শিক্ষার্থীদের তথ্য
     const staffCollection = db.collection('staff'); // teaching staff/non-teaching staff
@@ -550,9 +550,37 @@ async function run() {
       }
     });
 
+    // Delete Student
+    app.delete('/teachers/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const result = await staffCollection.deleteOne({ _id: new ObjectId(id) });
+
+        if (result.deletedCount === 0) {
+          return res.status(404).json({
+            success: false,
+            message: 'Teacher not found',
+          });
+        }
+
+        res.status(200).json({
+          success: true,
+          message: 'Teacher deleted successfully',
+          data: result,
+        });
+      } catch (error) {
+        console.error('Error deleting teacher:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to delete teacher',
+          error: error.message,
+        });
+      }
+    });
+
     //=================================================================================================================
 
-    console.log('Pinged your deployment. You successfully connected to MongoDB!');
+    // console.log('Pinged your deployment. You successfully connected to MongoDB!');
   } finally {
     // await client.close();
   }
