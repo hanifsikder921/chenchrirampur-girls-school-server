@@ -184,7 +184,7 @@ async function run() {
           page: pageNumber,
           pages: Math.ceil(total / limitNumber),
           data: students.map((student) => ({
-            id: student._id,
+            id: student._id.toHexString(),
             name: student.name,
             gender: student.gender,
             dob: student.dob,
@@ -334,6 +334,96 @@ async function run() {
         });
       }
     });
+
+    // Add this endpoint to your backend (before the Student Operation End>> comment)
+    // Bulk update students' class (promotion/migration)
+    // Student Migration Endpoint
+    app.patch('/students/migrate', async (req, res) => {
+      try {
+        const { studentIds, newClass, newAcademicYear } = req.body;
+
+        // Validate input
+        if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'No students selected for migration',
+          });
+        }
+
+        if (!newClass || !newAcademicYear) {
+          return res.status(400).json({
+            success: false,
+            message: 'New class and academic year are required',
+          });
+        }
+
+        // Validate each ID is a valid ObjectId
+        const invalidIds = studentIds.filter((id) => !ObjectId.isValid(id));
+        if (invalidIds.length > 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid student IDs format',
+            invalidIds,
+          });
+        }
+
+        const objectIds = studentIds.map((id) => new ObjectId(id));
+
+        // Check if students exist
+        const existingStudents = await studentCollection
+          .find({
+            _id: { $in: objectIds },
+          })
+          .toArray();
+
+        if (existingStudents.length !== studentIds.length) {
+          const foundIds = existingStudents.map((s) => s._id.toString());
+          const missingIds = studentIds.filter((id) => !foundIds.includes(id));
+
+          return res.status(404).json({
+            success: false,
+            message: 'Some students not found',
+            missingIds,
+          });
+        }
+
+        // Perform the migration
+        const result = await studentCollection.updateMany(
+          { _id: { $in: objectIds } },
+          {
+            $set: {
+              dclassName: newClass,
+              academicYear: newAcademicYear,
+              updatedAt: new Date(),
+            },
+          }
+        );
+
+        res.status(200).json({
+          success: true,
+          message: `${result.modifiedCount} students migrated to class ${newClass}`,
+          data: {
+            migratedCount: result.modifiedCount,
+            newClass,
+            newAcademicYear,
+          },
+        });
+      } catch (error) {
+        console.error('Migration error:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to migrate students',
+          error: error.message,
+          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+        });
+      }
+    });
+
+    // Add these endpoints to your existing backend code
+
+    // ================================================================================================ Student Migration Start>>>
+
+    // ================================================================================================ Student Migration End>>>
     // ================================================================================================ Student Operation End>>>
 
     //==>
