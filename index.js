@@ -48,6 +48,45 @@ async function run() {
     // ===============================================================================================
 
     // ================================================================================================ Student Operation start>>
+    // Get Student Name by Roll and Class
+    app.get('/student-name', async (req, res) => {
+      try {
+        const { roll, dclassName } = req.query;
+
+        if (!roll || !dclassName) {
+          return res.status(400).json({
+            success: false,
+            message: 'Roll number and class name are required',
+          });
+        }
+
+        const student = await studentCollection.findOne({
+          roll: roll.toString(),
+          dclassName: dclassName,
+        });
+
+        if (!student) {
+          return res.status(404).json({
+            success: false,
+            message: 'Student not found',
+          });
+        }
+
+        res.status(200).json({
+          success: true,
+          data: {
+            name: student.name,
+          },
+        });
+      } catch (error) {
+        console.error('Error fetching student name:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch student name',
+          error: error.message,
+        });
+      }
+    });
     // Post Student in Database
     app.post('/students', async (req, res) => {
       const { roll, dclassName } = req.body;
@@ -305,7 +344,7 @@ async function run() {
 
     // Post Marks in Database
     app.post('/marks', async (req, res) => {
-      const { examType, classesName, roll } = req.body;
+      const { examType, classesName, roll, examYear } = req.body;
 
       try {
         // Check if marks for same student, class & exam already exists
@@ -313,11 +352,12 @@ async function run() {
           examType: examType,
           classesName: classesName,
           roll: roll,
+          examYear: examYear,
         });
 
         if (marksExists) {
           return res.status(400).send({
-            message: 'This Student already has marks for this class and exam',
+            message: 'This Student already has marks for this class and exam ',
             inserted: false,
           });
         }
