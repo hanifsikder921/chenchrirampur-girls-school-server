@@ -76,6 +76,9 @@ async function run() {
           success: true,
           data: {
             name: student.name,
+            fatherName: student.fatherName,
+            motherName: student.motherName,
+            dob:student.dob
           },
         });
       } catch (error) {
