@@ -48,6 +48,37 @@ async function run() {
     // ===============================================================================================
 
     // ================================================================================================ Student Operation start>>
+
+    // Student Admission 
+    app.post('/students', async (req, res) => {
+      const studentData = req.body;
+
+      try {
+        // roll & class দিলে uniqueness চেক করবে
+        if (studentData.roll && studentData.dclassName) {
+          const userExists = await studentCollection.findOne({
+            roll: studentData.roll,
+            dclassName: studentData.dclassName,
+          });
+
+          if (userExists) {
+            return res.status(400).send({
+              message: 'Student with this roll number already exists in this class',
+              inserted: false,
+            });
+          }
+        }
+
+        const result = await studentCollection.insertOne(studentData);
+        res.send({ inserted: true, insertedId: result.insertedId });
+      } catch (error) {
+        res.status(500).send({
+          message: 'Error inserting student',
+          error: error.message,
+        });
+      }
+    });
+
     // Get Student Name by Roll and Class
     app.get('/student-name', async (req, res) => {
       try {
