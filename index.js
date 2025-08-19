@@ -33,6 +33,7 @@ async function run() {
     // await client.db('admin').command({ ping: 1 });
     const db = client.db('ChenchriGirls'); // Connect to the ChenchriGirls database
     const studentCollection = db.collection('students'); // শিক্ষার্থীদের তথ্য
+    const admissionCollection = db.collection('admissions'); // ভর্তি তথ্য
     const staffCollection = db.collection('staff'); // teaching staff/non-teaching staff
     const classCollection = db.collection('classes'); // ক্লাস ও সেকশন
     const subjectCollection = db.collection('subjects'); // বিষয় সমূহ
@@ -49,35 +50,67 @@ async function run() {
 
     // ================================================================================================ Student Operation start>>
 
-    // Student Admission 
-    app.post('/students', async (req, res) => {
-      const studentData = req.body;
-
+    // add admission data
+    app.post('/admissionsPost', async (req, res) => {
       try {
-        // roll & class দিলে uniqueness চেক করবে
-        if (studentData.roll && studentData.dclassName) {
-          const userExists = await studentCollection.findOne({
-            roll: studentData.roll,
-            dclassName: studentData.dclassName,
-          });
+        const admissionData = req.body;
+        const result = await admissionCollection.insertOne(admissionData);
 
-          if (userExists) {
-            return res.status(400).send({
-              message: 'Student with this roll number already exists in this class',
-              inserted: false,
-            });
-          }
-        }
-
-        const result = await studentCollection.insertOne(studentData);
-        res.send({ inserted: true, insertedId: result.insertedId });
+        res.send({ insertedId: result.insertedId });
       } catch (error) {
-        res.status(500).send({
-          message: 'Error inserting student',
-          error: error.message,
-        });
+        console.error(error);
+        res.status(500).send({ message: 'Failed to submit admission form' });
       }
     });
+    // সব Admission ডেটা গেট করা
+    app.get('/admissions', async (req, res) => {
+      try {
+        const result = await admissionCollection.find().toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: 'Failed to fetch admission data' });
+      }
+    });
+
+    // নির্দিষ্ট Admission ডেটা ডিলিট করা
+    app.delete('/admissions/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const result = await admissionCollection.deleteOne({ _id: new ObjectId(id) });
+
+        if (result.deletedCount === 1) {
+          res.send({ success: true, message: 'Admission deleted successfully' });
+        } else {
+          res.status(404).send({ success: false, message: 'Admission not found' });
+        }
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: 'Failed to delete admission' });
+      }
+    });
+
+    // Update admission status
+    app.patch('/admissions/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { status } = req.body;
+        const result = await admissionCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status } }
+        );
+
+        if (result.modifiedCount === 1) {
+          res.send({ success: true, message: 'Admission status updated successfully' });
+        } else {
+          res.status(404).send({ success: false, message: 'Admission not found' });
+        }
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: 'Failed to update admission status' });
+      }
+    });
+    
 
     // Get Student Name by Roll and Class
     app.get('/student-name', async (req, res) => {
@@ -109,7 +142,7 @@ async function run() {
             name: student.name,
             fatherName: student.fatherName,
             motherName: student.motherName,
-            dob:student.dob
+            dob: student.dob,
           },
         });
       } catch (error) {
