@@ -48,8 +48,7 @@ async function run() {
 
     // ===============================================================================================
 
-    // ================================================================================================ Student Operation start>>
-
+    // ================================================================================================ Student Admission Operation start>>
     // add admission data
     app.post('/admissionsPost', async (req, res) => {
       try {
@@ -110,7 +109,10 @@ async function run() {
         res.status(500).send({ message: 'Failed to update admission status' });
       }
     });
-    
+
+    // ================================================================================================ Student Admission Operation End>>
+
+    // ================================================================================================ Student Operation start>>
 
     // Get Student Name by Roll and Class
     app.get('/student-name', async (req, res) => {
@@ -485,6 +487,248 @@ async function run() {
         });
       }
     });
+
+    // Student Statistics Endpoint
+    // Add these endpoints to your existing backend code (after Student Operation End>>> comment)
+
+    // ================================================================================================ Student Statistics Operation Start>>>
+
+    // Get overall student statistics
+    app.get('/students/stats/overview', async (req, res) => {
+      try {
+        // Total students
+        const totalStudents = await studentCollection.countDocuments({ status: 'active' });
+
+        // Total male students
+        const totalMaleStudents = await studentCollection.countDocuments({
+          status: 'active',
+          gender: 'Male',
+        });
+
+        // Total female students
+        const totalFemaleStudents = await studentCollection.countDocuments({
+          status: 'active',
+          gender: 'Female',
+        });
+
+        res.status(200).json({
+          success: true,
+          data: {
+            totalStudents,
+            totalMaleStudents,
+            totalFemaleStudents,
+          },
+        });
+      } catch (error) {
+        console.error('Error fetching student overview stats:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch student statistics',
+          error: error.message,
+        });
+      }
+    });
+
+    // Get class-wise student statistics
+    app.get('/students/stats/class-wise', async (req, res) => {
+      try {
+        const classStats = await studentCollection
+          .aggregate([
+            {
+              $match: { status: 'active' },
+            },
+            {
+              $group: {
+                _id: '$dclassName',
+                totalStudents: { $sum: 1 },
+                maleStudents: {
+                  $sum: { $cond: [{ $eq: ['$gender', 'Male'] }, 1, 0] },
+                },
+                femaleStudents: {
+                  $sum: { $cond: [{ $eq: ['$gender', 'Female'] }, 1, 0] },
+                },
+              },
+            },
+            {
+              $sort: { _id: 1 },
+            },
+          ])
+          .toArray();
+
+        res.status(200).json({
+          success: true,
+          data: classStats.map((stat) => ({
+            className: stat._id,
+            totalStudents: stat.totalStudents,
+            maleStudents: stat.maleStudents,
+            femaleStudents: stat.femaleStudents,
+          })),
+        });
+      } catch (error) {
+        console.error('Error fetching class-wise stats:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch class-wise statistics',
+          error: error.message,
+        });
+      }
+    });
+
+    // Get section-wise statistics for classes 9 and 10
+    app.get('/students/stats/section-wise', async (req, res) => {
+      try {
+        const sectionStats = await studentCollection
+          .aggregate([
+            {
+              $match: {
+                status: 'active',
+                dclassName: { $in: ['9', '10'] },
+              },
+            },
+            {
+              $group: {
+                _id: {
+                  className: '$dclassName',
+                  section: '$section',
+                },
+                totalStudents: { $sum: 1 },
+                maleStudents: {
+                  $sum: { $cond: [{ $eq: ['$gender', 'Male'] }, 1, 0] },
+                },
+                femaleStudents: {
+                  $sum: { $cond: [{ $eq: ['$gender', 'Female'] }, 1, 0] },
+                },
+              },
+            },
+            {
+              $sort: { '_id.className': 1, '_id.section': 1 },
+            },
+          ])
+          .toArray();
+
+        res.status(200).json({
+          success: true,
+          data: sectionStats.map((stat) => ({
+            className: stat._id.className,
+            section: stat._id.section,
+            totalStudents: stat.totalStudents,
+            maleStudents: stat.maleStudents,
+            femaleStudents: stat.femaleStudents,
+          })),
+        });
+      } catch (error) {
+        console.error('Error fetching section-wise stats:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch section-wise statistics',
+          error: error.message,
+        });
+      }
+    });
+
+    // Get detailed statistics with all breakdowns
+    app.get('/students/stats/detailed', async (req, res) => {
+      try {
+        // Overall stats
+        const totalStudents = await studentCollection.countDocuments({ status: 'active' });
+        const totalMaleStudents = await studentCollection.countDocuments({
+          status: 'active',
+          gender: 'Male',
+        });
+        const totalFemaleStudents = await studentCollection.countDocuments({
+          status: 'active',
+          gender: 'Female',
+        });
+
+        // Class-wise stats
+        const classStats = await studentCollection
+          .aggregate([
+            {
+              $match: { status: 'active' },
+            },
+            {
+              $group: {
+                _id: '$dclassName',
+                totalStudents: { $sum: 1 },
+                maleStudents: {
+                  $sum: { $cond: [{ $eq: ['$gender', 'Male'] }, 1, 0] },
+                },
+                femaleStudents: {
+                  $sum: { $cond: [{ $eq: ['$gender', 'Female'] }, 1, 0] },
+                },
+              },
+            },
+            {
+              $sort: { _id: 1 },
+            },
+          ])
+          .toArray();
+
+        // Section-wise stats for classes 9 and 10
+        const sectionStats = await studentCollection
+          .aggregate([
+            {
+              $match: {
+                status: 'active',
+                dclassName: { $in: ['9', '10'] },
+              },
+            },
+            {
+              $group: {
+                _id: {
+                  className: '$dclassName',
+                  section: '$section',
+                },
+                totalStudents: { $sum: 1 },
+                maleStudents: {
+                  $sum: { $cond: [{ $eq: ['$gender', 'Male'] }, 1, 0] },
+                },
+                femaleStudents: {
+                  $sum: { $cond: [{ $eq: ['$gender', 'Female'] }, 1, 0] },
+                },
+                
+              },
+            },
+            {
+              $sort: { '_id.className': 1, '_id.section': 1 },
+            },
+          ])
+          .toArray();
+
+        res.status(200).json({
+          success: true,
+          data: {
+            overview: {
+              totalStudents,
+              totalMaleStudents,
+              totalFemaleStudents,
+            },
+            classWise: classStats.map((stat) => ({
+              className: stat._id,
+              totalStudents: stat.totalStudents,
+              maleStudents: stat.maleStudents,
+              femaleStudents: stat.femaleStudents,
+            })),
+            sectionWise: sectionStats.map((stat) => ({
+              className: stat._id.className,
+              section: stat._id.section,
+              totalStudents: stat.totalStudents,
+              maleStudents: stat.maleStudents,
+              femaleStudents: stat.femaleStudents,
+            })),
+          },
+        });
+      } catch (error) {
+        console.error('Error fetching detailed stats:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch detailed statistics',
+          error: error.message,
+        });
+      }
+    });
+
+    // ================================================================================================ Student Statistics Operation End>>>
 
     // Add these endpoints to your existing backend code
 
