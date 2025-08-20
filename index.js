@@ -1230,13 +1230,13 @@ async function run() {
         const limitNumber = parseInt(limit);
         const skip = (pageNumber - 1) * limitNumber;
 
-        // Get total count for pagination
+
         const total = await staffCollection.countDocuments();
 
-        // Fetch teachers with pagination
+    
         const teachers = await staffCollection
           .find({})
-          .sort({ dclassName: 1, roll: 1 }) // Default sorting
+          .sort({ createdAt: 1, dclassName: -1, roll: 1 }) 
           .skip(skip)
           .limit(limitNumber)
           .toArray();
@@ -1252,8 +1252,10 @@ async function run() {
             designation: teacher.designation || '-',
             indexno: teacher.indexno,
             gender: teacher.gender,
+            subject:teacher.subject,
             phone: teacher.phone || '-',
             image: teacher.image || '/default-avatar.png',
+            createdAt: teacher.createdAt, // Optional: include createdAt in response
           })),
         });
       } catch (error) {
