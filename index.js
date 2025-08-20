@@ -48,6 +48,355 @@ async function run() {
 
     // ===============================================================================================
 
+    // ================================================================================================ School Overview Stats Code start>>
+
+    // Add these endpoints to your existing backend code (before the final app.listen())
+
+    // ================================================================================================ Overview Stats Operation Start>>>
+
+    // Get Teacher Statistics
+    app.get('/stats/teachers', async (req, res) => {
+      try {
+        // Teachers have subjects (not "N/A")
+        const totalTeachers = await staffCollection.countDocuments({
+          status: 'active',
+          subject: { $ne: 'N/A' },
+        });
+
+        const maleTeachers = await staffCollection.countDocuments({
+          status: 'active',
+          gender: 'Male',
+          subject: { $ne: 'N/A' },
+        });
+
+        const femaleTeachers = await staffCollection.countDocuments({
+          status: 'active',
+          gender: 'Female',
+          subject: { $ne: 'N/A' },
+        });
+
+        // Subject-wise teacher count
+        const subjectWiseTeachers = await staffCollection
+          .aggregate([
+            {
+              $match: {
+                status: 'active',
+                subject: { $ne: 'N/A' },
+              },
+            },
+            {
+              $group: {
+                _id: '$subject',
+                count: { $sum: 1 },
+              },
+            },
+            { $sort: { _id: 1 } },
+          ])
+          .toArray();
+
+        res.status(200).json({
+          success: true,
+          data: {
+            totalTeachers,
+            maleTeachers,
+            femaleTeachers,
+            subjectWise: subjectWiseTeachers.map((item) => ({
+              subject: item._id,
+              count: item.count,
+            })),
+          },
+        });
+      } catch (error) {
+        console.error('Error fetching teacher stats:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch teacher statistics',
+          error: error.message,
+        });
+      }
+    });
+
+    // Get Staff Statistics (Non-teaching staff)
+    app.get('/stats/staff', async (req, res) => {
+      try {
+        // Staff have subject as "N/A"
+        const totalStaff = await staffCollection.countDocuments({
+          status: 'active',
+          subject: 'N/A',
+        });
+
+        const maleStaff = await staffCollection.countDocuments({
+          status: 'active',
+          gender: 'Male',
+          subject: 'N/A',
+        });
+
+        const femaleStaff = await staffCollection.countDocuments({
+          status: 'active',
+          gender: 'Female',
+          subject: 'N/A',
+        });
+
+        // Designation-wise staff count
+        const designationWiseStaff = await staffCollection
+          .aggregate([
+            {
+              $match: {
+                status: 'active',
+                subject: 'N/A',
+              },
+            },
+            {
+              $group: {
+                _id: '$designation',
+                count: { $sum: 1 },
+              },
+            },
+            { $sort: { _id: 1 } },
+          ])
+          .toArray();
+
+        res.status(200).json({
+          success: true,
+          data: {
+            totalStaff,
+            maleStaff,
+            femaleStaff,
+            designationWise: designationWiseStaff.map((item) => ({
+              designation: item._id,
+              count: item.count,
+            })),
+          },
+        });
+      } catch (error) {
+        console.error('Error fetching staff stats:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch staff statistics',
+          error: error.message,
+        });
+      }
+    });
+
+    // Get Student Religion and Class Statistics
+    app.get('/stats/students/detailed', async (req, res) => {
+      try {
+        // Overall student stats
+        const totalStudents = await studentCollection.countDocuments({ status: 'active' });
+        const maleStudents = await studentCollection.countDocuments({
+          status: 'active',
+          gender: 'Male',
+        });
+        const femaleStudents = await studentCollection.countDocuments({
+          status: 'active',
+          gender: 'Female',
+        });
+
+        // Religion-wise stats
+        const religionStats = await studentCollection
+          .aggregate([
+            {
+              $match: { status: 'active' },
+            },
+            {
+              $group: {
+                _id: '$religion',
+                total: { $sum: 1 },
+                male: { $sum: { $cond: [{ $eq: ['$gender', 'Male'] }, 1, 0] } },
+                female: { $sum: { $cond: [{ $eq: ['$gender', 'Female'] }, 1, 0] } },
+              },
+            },
+            { $sort: { _id: 1 } },
+          ])
+          .toArray();
+
+        // Class and Religion wise stats
+        const classReligionStats = await studentCollection
+          .aggregate([
+            {
+              $match: { status: 'active' },
+            },
+            {
+              $group: {
+                _id: {
+                  className: '$dclassName',
+                  religion: '$religion',
+                },
+                count: { $sum: 1 },
+              },
+            },
+            {
+              $sort: { '_id.className': 1, '_id.religion': 1 },
+            },
+          ])
+          .toArray();
+
+        // Blood group stats
+        const bloodGroupStats = await studentCollection
+          .aggregate([
+            {
+              $match: { status: 'active' },
+            },
+            {
+              $group: {
+                _id: '$bloodGroup',
+                count: { $sum: 1 },
+              },
+            },
+            { $sort: { _id: 1 } },
+          ])
+          .toArray();
+
+        // Class-wise stats
+        const classStats = await studentCollection
+          .aggregate([
+            {
+              $match: { status: 'active' },
+            },
+            {
+              $group: {
+                _id: '$dclassName',
+                total: { $sum: 1 },
+                male: { $sum: { $cond: [{ $eq: ['$gender', 'Male'] }, 1, 0] } },
+                female: { $sum: { $cond: [{ $eq: ['$gender', 'Female'] }, 1, 0] } },
+              },
+            },
+            { $sort: { _id: 1 } },
+          ])
+          .toArray();
+
+        res.status(200).json({
+          success: true,
+          data: {
+            overview: {
+              totalStudents,
+              maleStudents,
+              femaleStudents,
+            },
+            religionStats: religionStats.map((item) => ({
+              religion: item._id,
+              total: item.total,
+              male: item.male,
+              female: item.female,
+            })),
+            classReligionStats: classReligionStats.map((item) => ({
+              className: item._id.className,
+              religion: item._id.religion,
+              count: item.count,
+            })),
+            bloodGroupStats: bloodGroupStats.map((item) => ({
+              bloodGroup: item._id,
+              count: item.count,
+            })),
+            classStats: classStats.map((item) => ({
+              className: item._id,
+              total: item.total,
+              male: item.male,
+              female: item.female,
+            })),
+          },
+        });
+      } catch (error) {
+        console.error('Error fetching detailed student stats:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch detailed student statistics',
+          error: error.message,
+        });
+      }
+    });
+
+    // Get Complete Overview Stats
+    app.get('/stats/overview', async (req, res) => {
+      try {
+        // Teacher Stats
+        const totalTeachers = await staffCollection.countDocuments({
+          status: 'active',
+          subject: { $ne: 'N/A' },
+        });
+        const maleTeachers = await staffCollection.countDocuments({
+          status: 'active',
+          gender: 'Male',
+          subject: { $ne: 'N/A' },
+        });
+        const femaleTeachers = await staffCollection.countDocuments({
+          status: 'active',
+          gender: 'Female',
+          subject: { $ne: 'N/A' },
+        });
+
+        // Staff Stats
+        const totalStaff = await staffCollection.countDocuments({
+          status: 'active',
+          subject: 'N/A',
+        });
+        const maleStaff = await staffCollection.countDocuments({
+          status: 'active',
+          gender: 'Male',
+          subject: 'N/A',
+        });
+        const femaleStaff = await staffCollection.countDocuments({
+          status: 'active',
+          gender: 'Female',
+          subject: 'N/A',
+        });
+
+        // Student Stats
+        const totalStudents = await studentCollection.countDocuments({ status: 'active' });
+        const maleStudents = await studentCollection.countDocuments({
+          status: 'active',
+          gender: 'Male',
+        });
+        const femaleStudents = await studentCollection.countDocuments({
+          status: 'active',
+          gender: 'Female',
+        });
+
+        // Religion-wise student stats
+        const muslimStudents = await studentCollection.countDocuments({
+          status: 'active',
+          religion: 'Islam',
+        });
+        const hinduStudents = await studentCollection.countDocuments({
+          status: 'active',
+          religion: 'Hindu',
+        });
+
+        res.status(200).json({
+          success: true,
+          data: {
+            teachers: {
+              total: totalTeachers,
+              male: maleTeachers,
+              female: femaleTeachers,
+            },
+            staff: {
+              total: totalStaff,
+              male: maleStaff,
+              female: femaleStaff,
+            },
+            students: {
+              total: totalStudents,
+              male: maleStudents,
+              female: femaleStudents,
+              muslim: muslimStudents,
+              hindu: hinduStudents,
+            },
+          },
+        });
+      } catch (error) {
+        console.error('Error fetching overview stats:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch overview statistics',
+          error: error.message,
+        });
+      }
+    });
+
+    // ================================================================================================ Overview Stats Operation End>>>
+    // ================================================================================================ School Overview Code End>>
+
     // ================================================================================================ Student Admission Operation start>>
     // add admission data
     app.post('/admissionsPost', async (req, res) => {
@@ -686,7 +1035,6 @@ async function run() {
                 femaleStudents: {
                   $sum: { $cond: [{ $eq: ['$gender', 'Female'] }, 1, 0] },
                 },
-                
               },
             },
             {
