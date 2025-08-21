@@ -463,6 +463,41 @@ async function run() {
 
     // ================================================================================================ Student Operation start>>
 
+    // Get students by class
+    app.get('/students/by-class', async (req, res) => {
+      try {
+        const { className, status = 'active' } = req.query;
+
+        if (!className) {
+          return res.status(400).json({
+            success: false,
+            message: 'Class name is required',
+          });
+        }
+
+        const students = await studentCollection
+          .find({
+            dclassName: className,
+            status: status,
+          })
+          .sort({ roll: 1 })
+          .toArray();
+
+        res.status(200).json({
+          success: true,
+          data: students,
+        });
+      } catch (error) {
+        console.error('Error fetching students by class:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch students',
+          error: error.message,
+        });
+      }
+    });
+    
+
     // Get Student Name by Roll and Class
     app.get('/student-name', async (req, res) => {
       try {
@@ -1224,19 +1259,17 @@ async function run() {
     // Get Teachers in Database
     app.get('/teachers', async (req, res) => {
       try {
-        const { page = 1, limit = 10 } = req.query;
+        const { page = 1, limit = 25 } = req.query;
 
         const pageNumber = parseInt(page);
         const limitNumber = parseInt(limit);
         const skip = (pageNumber - 1) * limitNumber;
 
-
         const total = await staffCollection.countDocuments();
 
-    
         const teachers = await staffCollection
           .find({})
-          .sort({ createdAt: 1, dclassName: -1, roll: 1 }) 
+          .sort({ createdAt: 1, dclassName: -1, roll: 1 })
           .skip(skip)
           .limit(limitNumber)
           .toArray();
@@ -1252,7 +1285,7 @@ async function run() {
             designation: teacher.designation || '-',
             indexno: teacher.indexno,
             gender: teacher.gender,
-            subject:teacher.subject,
+            subject: teacher.subject,
             phone: teacher.phone || '-',
             image: teacher.image || '/default-avatar.png',
             createdAt: teacher.createdAt, // Optional: include createdAt in response
