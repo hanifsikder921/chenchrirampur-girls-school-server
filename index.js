@@ -35,14 +35,9 @@ async function run() {
     const studentCollection = db.collection('students'); // শিক্ষার্থীদের তথ্য
     const admissionCollection = db.collection('admissions'); // ভর্তি তথ্য
     const staffCollection = db.collection('staff'); // teaching staff/non-teaching staff
-    const classCollection = db.collection('classes'); // ক্লাস ও সেকশন
-    const subjectCollection = db.collection('subjects'); // বিষয় সমূহ
-    const examCollection = db.collection('exams'); // পরীক্ষার তথ্য
     const marksCollection = db.collection('marks'); // শিক্ষার্থীদের মার্কস / রেজাল্ট
-    const attendanceCollection = db.collection('attendance'); // উপস্থিতি
+    const infoCollection = db.collection('info'); // SchoolInformation
     const noticeCollection = db.collection('notices'); // নোটিশ / ঘোষণা
-    const feesCollection = db.collection('fees'); // ফি সংক্রান্ত তথ্য
-    const scrollNoticeCollection = db.collection('scrollNotices'); // স্ক্রল নোটিশ
 
     //=================================================================================================================
 
@@ -53,6 +48,168 @@ async function run() {
     // Add these endpoints to your existing backend code (before the final app.listen())
 
     // ================================================================================================ Overview Stats Operation Start>>>
+
+    // সব inforamtion ডেটা গেট করা
+    app.get('/info', async (req, res) => {
+      try {
+        const result = await infoCollection.find().toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: 'Failed to fetch school data' });
+      }
+    });
+
+    // Add this code to your existing backend after the info GET endpoint
+
+    // PATCH method for updating school information in info collection
+
+    app.patch('/info/:id', async (req, res) => {
+      try {
+        const schoolId = req.params.id;
+        let updateData = req.body;
+
+        console.log('Update Request - School ID:', schoolId);
+        console.log('Update Data:', JSON.stringify(updateData, null, 2));
+
+        // Validate ObjectId
+        if (!ObjectId.isValid(schoolId)) {
+          console.log('Invalid ObjectId format:', schoolId);
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid school ID format',
+          });
+        }
+
+        // Check if document exists first
+        const existingSchool = await infoCollection.findOne({ _id: new ObjectId(schoolId) });
+        if (!existingSchool) {
+          console.log('School not found with ID:', schoolId);
+          return res.status(404).json({
+            success: false,
+            message: 'School information not found',
+          });
+        }
+
+        // 🚫 Ensure _id never updates
+        if ('_id' in updateData) {
+          delete updateData._id;
+        }
+
+        // Remove undefined, null, or empty values
+        const cleanUpdateData = {};
+        Object.keys(updateData).forEach((key) => {
+          if (updateData[key] !== undefined && updateData[key] !== null && updateData[key] !== '') {
+            cleanUpdateData[key] = updateData[key];
+          }
+        });
+
+        console.log('Clean Update Data:', JSON.stringify(cleanUpdateData, null, 2));
+
+        // Convert string numbers to integers
+        if (cleanUpdateData.totalStudents) {
+          cleanUpdateData.totalStudents = parseInt(cleanUpdateData.totalStudents) || 0;
+        }
+        if (cleanUpdateData.totalTeachers) {
+          cleanUpdateData.totalTeachers = parseInt(cleanUpdateData.totalTeachers) || 0;
+        }
+
+        // Handle grades array (string → array)
+        if (cleanUpdateData.grades && typeof cleanUpdateData.grades === 'string') {
+          cleanUpdateData.grades = cleanUpdateData.grades
+            .split(',')
+            .map((grade) => grade.trim())
+            .filter((grade) => grade !== '');
+        }
+
+        // Handle facilities array (string → array)
+        if (cleanUpdateData.facilities && typeof cleanUpdateData.facilities === 'string') {
+          cleanUpdateData.facilities = cleanUpdateData.facilities
+            .split(',')
+            .map((facility) => facility.trim())
+            .filter((facility) => facility !== '');
+        }
+
+        // Add updatedAt timestamp
+        cleanUpdateData.updatedAt = new Date();
+
+        console.log('Final Update Data:', JSON.stringify(cleanUpdateData, null, 2));
+
+        // Update in MongoDB
+        const result = await infoCollection.updateOne(
+          { _id: new ObjectId(schoolId) },
+          { $set: cleanUpdateData }
+        );
+
+        console.log('MongoDB Update Result:', result);
+
+        if (result.matchedCount === 0) {
+          return res.status(404).json({
+            success: false,
+            message: 'School information not found during update',
+          });
+        }
+
+        // Return updated doc
+        const updatedSchool = await infoCollection.findOne({ _id: new ObjectId(schoolId) });
+
+        console.log('Update successful');
+
+        res.status(200).json({
+          success: true,
+          message: 'School information updated successfully',
+          data: updatedSchool,
+        });
+      } catch (error) {
+        console.error('Error updating school information:', error);
+        console.error('Error stack:', error.stack);
+
+        res.status(500).json({
+          success: false,
+          message: 'Internal server error',
+          error: error.message,
+          details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+        });
+      }
+    });
+
+
+    // Make sure to REMOVE the duplicate/simple PATCH endpoint that comes after this
+    // Only keep this comprehensive one
+
+    // GET single school info by ID
+    app.get('/info/:id', async (req, res) => {
+      try {
+        const schoolId = req.params.id;
+
+        if (!ObjectId.isValid(schoolId)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid school ID format',
+          });
+        }
+
+        const school = await infoCollection.findOne({ _id: new ObjectId(schoolId) });
+
+        if (!school) {
+          return res.status(404).json({
+            success: false,
+            message: 'School information not found',
+          });
+        }
+
+        res.status(200).json({
+          success: true,
+          data: school,
+        });
+      } catch (error) {
+        console.error('Error fetching school information:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Internal server error',
+        });
+      }
+    });
 
     // Get Teacher Statistics
     app.get('/stats/teachers', async (req, res) => {
@@ -496,7 +653,6 @@ async function run() {
         });
       }
     });
-    
 
     // Get Student Name by Roll and Class
     app.get('/student-name', async (req, res) => {
