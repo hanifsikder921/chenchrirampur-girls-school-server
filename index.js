@@ -222,8 +222,6 @@ async function run() {
         const schoolId = req.params.id;
         let updateData = req.body;
 
-   
-
         // Validate ObjectId
         if (!ObjectId.isValid(schoolId)) {
           return res.status(400).json({
@@ -254,8 +252,6 @@ async function run() {
           }
         });
 
-
-
         // Convert string numbers to integers
         if (cleanUpdateData.totalStudents) {
           cleanUpdateData.totalStudents = parseInt(cleanUpdateData.totalStudents) || 0;
@@ -283,15 +279,11 @@ async function run() {
         // Add updatedAt timestamp
         cleanUpdateData.updatedAt = new Date();
 
-
-
         // Update in MongoDB
         const result = await infoCollection.updateOne(
           { _id: new ObjectId(schoolId) },
           { $set: cleanUpdateData }
         );
-
-
 
         if (result.matchedCount === 0) {
           return res.status(404).json({
@@ -302,8 +294,6 @@ async function run() {
 
         // Return updated doc
         const updatedSchool = await infoCollection.findOne({ _id: new ObjectId(schoolId) });
-
-
 
         res.status(200).json({
           success: true,
@@ -766,6 +756,52 @@ async function run() {
 
     // ================================================================================================ Student Operation start>>
 
+    // Get student Bu Uid
+    // Student Operation এর মধ্যে এই endpoint টি যোগ করুন (অন্যান্য student endpoints এর সাথে)
+
+    // Get Student by UID
+    app.get('/students/uid/:uid', async (req, res) => {
+      try {
+        const { uid } = req.params;
+
+        if (!uid) {
+          return res.status(400).json({
+            success: false,
+            message: 'UID is required',
+          });
+        }
+
+        // UID দিয়ে student খুঁজুন
+        const student = await studentCollection.findOne({
+          uid: uid.toString(),
+          status: 'active',
+        });
+
+        if (!student) {
+          return res.status(404).json({
+            success: false,
+            message: 'Student not found with this UID',
+          });
+        }
+
+        res.status(200).json({
+          success: true,
+          data: student,
+        });
+      } catch (error) {
+        console.error('Error fetching student by UID:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch student',
+          error: error.message,
+        });
+      }
+    });
+
+    // Alternative: UID দিয়ে search করার জন্য existing /students endpoint এ UID support যোগ করুন
+    // আপনার existing /students GET endpoint এ এই অংশটি যোগ করুন:
+
+   
     // Get students by class
     app.get('/students/by-class', async (req, res) => {
       try {
@@ -844,17 +880,28 @@ async function run() {
     });
     // Post Student in Database
     app.post('/students', async (req, res) => {
-      const { roll, dclassName } = req.body;
+      const { roll, dclassName, uid } = req.body;
 
       // Check if student with same roll and class already exists
       const userExists = await studentCollection.findOne({
         roll: roll,
+        uid: uid,
         dclassName: dclassName,
       });
 
+      const uidExist = await studentCollection.findOne({
+        uid: uid,
+      });
+      if (uidExist) {
+        return res.status(400).send({
+          message: 'Student  uid already exists in this School',
+          inserted: false,
+        });
+      }
+
       if (userExists) {
         return res.status(400).send({
-          message: 'Student with this roll number already exists in this class',
+          message: 'Student with this roll number  already exists in this class',
           inserted: false,
         });
       }
