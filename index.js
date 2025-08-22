@@ -44,6 +44,71 @@ async function run() {
 
     // ===============================================================================================
 
+    app.get('/notices', async (req, res) => {
+      try {
+        const notices = await noticeCollection.find({}).sort({ createdAt: -1 }).toArray();
+        res.json(notices);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // নতুন নোটিশ যোগ করা
+    app.post('/notices', async (req, res) => {
+      try {
+        const { title, imageUrl } = req.body;
+        const newNotice = {
+          title,
+          imageUrl,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        const result = await noticeCollection.insertOne(newNotice);
+        res.status(201).json({ ...newNotice, _id: result.insertedId });
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // নোটিশ আপডেট করা
+    app.put('/notices/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { title, imageUrl } = req.body;
+
+        const result = await noticeCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { title, imageUrl, updatedAt: new Date() } }
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ error: 'Notice not found' });
+        }
+
+        res.json({ message: 'Notice updated successfully' });
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // নোটিশ ডিলিট করা
+    app.delete('/notices/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        const result = await noticeCollection.deleteOne({ _id: new ObjectId(id) });
+
+        if (result.deletedCount === 0) {
+          return res.status(404).json({ error: 'Notice not found' });
+        }
+
+        res.json({ message: 'Notice deleted successfully' });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     // ================================================================================================ Image Gallery Code Mangement Start>>
     // সকল ইমেজ পাওয়া
     app.get('/imageMedia', async (req, res) => {
@@ -157,12 +222,10 @@ async function run() {
         const schoolId = req.params.id;
         let updateData = req.body;
 
-        console.log('Update Request - School ID:', schoolId);
-        console.log('Update Data:', JSON.stringify(updateData, null, 2));
+   
 
         // Validate ObjectId
         if (!ObjectId.isValid(schoolId)) {
-          console.log('Invalid ObjectId format:', schoolId);
           return res.status(400).json({
             success: false,
             message: 'Invalid school ID format',
@@ -172,7 +235,6 @@ async function run() {
         // Check if document exists first
         const existingSchool = await infoCollection.findOne({ _id: new ObjectId(schoolId) });
         if (!existingSchool) {
-          console.log('School not found with ID:', schoolId);
           return res.status(404).json({
             success: false,
             message: 'School information not found',
@@ -192,7 +254,7 @@ async function run() {
           }
         });
 
-        console.log('Clean Update Data:', JSON.stringify(cleanUpdateData, null, 2));
+
 
         // Convert string numbers to integers
         if (cleanUpdateData.totalStudents) {
@@ -221,7 +283,7 @@ async function run() {
         // Add updatedAt timestamp
         cleanUpdateData.updatedAt = new Date();
 
-        console.log('Final Update Data:', JSON.stringify(cleanUpdateData, null, 2));
+
 
         // Update in MongoDB
         const result = await infoCollection.updateOne(
@@ -229,7 +291,7 @@ async function run() {
           { $set: cleanUpdateData }
         );
 
-        console.log('MongoDB Update Result:', result);
+
 
         if (result.matchedCount === 0) {
           return res.status(404).json({
@@ -241,7 +303,7 @@ async function run() {
         // Return updated doc
         const updatedSchool = await infoCollection.findOne({ _id: new ObjectId(schoolId) });
 
-        console.log('Update successful');
+
 
         res.status(200).json({
           success: true,
