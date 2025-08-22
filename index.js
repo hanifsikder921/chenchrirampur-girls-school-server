@@ -37,15 +37,105 @@ async function run() {
     const staffCollection = db.collection('staff'); // teaching staff/non-teaching staff
     const marksCollection = db.collection('marks'); // শিক্ষার্থীদের মার্কস / রেজাল্ট
     const infoCollection = db.collection('info'); // SchoolInformation
+    const imageCollection = db.collection('mediaImage');
     const noticeCollection = db.collection('notices'); // নোটিশ / ঘোষণা
 
     //=================================================================================================================
 
     // ===============================================================================================
 
-    // ================================================================================================ School Overview Stats Code start>>
+    // ================================================================================================ Image Gallery Code Mangement Start>>
+    // সকল ইমেজ পাওয়া
+    app.get('/imageMedia', async (req, res) => {
+      try {
+        const images = await imageCollection.find({}).toArray();
+        res.json(images);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
 
-    // Add these endpoints to your existing backend code (before the final app.listen())
+    // নতুন ইমেজ যোগ করা
+    app.post('/imageMedia', async (req, res) => {
+      try {
+        const { title, imageUrl, feature, banner, gallery } = req.body;
+        const newImage = {
+          title,
+          imageUrl,
+          feature: feature || false,
+          banner: banner || false,
+          gallery: gallery || false,
+          createdAt: new Date(),
+        };
+
+        const result = await imageCollection.insertOne(newImage);
+        res.status(201).json({ ...newImage, _id: result.insertedId });
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // ইমেজ আপডেট করা
+    app.put('/imageMedia/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { title, imageUrl } = req.body;
+
+        const result = await imageCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { title, imageUrl } }
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ error: 'Image not found' });
+        }
+
+        res.json({ message: 'Image updated successfully' });
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // ফিচার বা ব্যানার স্ট্যাটাস আপডেট
+    app.patch('/imageMedia/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const updates = req.body;
+
+        const result = await imageCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: updates }
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ error: 'Image not found' });
+        }
+
+        res.json({ message: 'Image updated successfully' });
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // ইমেজ ডিলিট করা
+    app.delete('/imageMedia/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        const result = await imageCollection.deleteOne({ _id: new ObjectId(id) });
+
+        if (result.deletedCount === 0) {
+          return res.status(404).json({ error: 'Image not found' });
+        }
+
+        res.json({ message: 'Image deleted successfully' });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+    // ================================================================================================ Image Gallery Code Mangement Ends>>
+
+    // ================================================================================================ School Overview Stats Code start>>
 
     // ================================================================================================ Overview Stats Operation Start>>>
 
@@ -59,8 +149,6 @@ async function run() {
         res.status(500).send({ message: 'Failed to fetch school data' });
       }
     });
-
-    // Add this code to your existing backend after the info GET endpoint
 
     // PATCH method for updating school information in info collection
 
@@ -172,10 +260,6 @@ async function run() {
         });
       }
     });
-
-
-    // Make sure to REMOVE the duplicate/simple PATCH endpoint that comes after this
-    // Only keep this comprehensive one
 
     // GET single school info by ID
     app.get('/info/:id', async (req, res) => {
