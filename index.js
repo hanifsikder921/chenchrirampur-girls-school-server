@@ -38,11 +38,26 @@ async function run() {
     const marksCollection = db.collection('marks'); // শিক্ষার্থীদের মার্কস / রেজাল্ট
     const infoCollection = db.collection('info'); // SchoolInformation
     const imageCollection = db.collection('mediaImage');
-    const noticeCollection = db.collection('notices'); // নোটিশ / ঘোষণা
+    const noticeCollection = db.collection('notices');
+    const subjectCollection = db.collection('subjectJson');
 
     //=================================================================================================================
+  
 
     // ===============================================================================================
+    // ===============================================================================================Subject Management==============>>
+
+    // সব Subject ডেটা গেট করা
+    app.get('/subjectJson', async (req, res) => {
+      try {
+        const result = await subjectCollection.find().toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: 'Failed to fetch Subjcet name' });
+      }
+    });
+    // ===============================================================================================Subject Management==============>>
 
     app.get('/notices', async (req, res) => {
       try {
@@ -1658,6 +1673,7 @@ async function run() {
             email: teacher.email,
             role: teacher.role,
             subject: teacher.subject,
+            assignSubject: teacher.assignSubject,
             phone: teacher.phone || '-',
             image: teacher.image || '/default-avatar.png',
             createdAt: teacher.createdAt, // Optional: include createdAt in response
