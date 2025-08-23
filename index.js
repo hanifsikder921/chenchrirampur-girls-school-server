@@ -801,7 +801,6 @@ async function run() {
     // Alternative: UID দিয়ে search করার জন্য existing /students endpoint এ UID support যোগ করুন
     // আপনার existing /students GET endpoint এ এই অংশটি যোগ করুন:
 
-   
     // Get students by class
     app.get('/students/by-class', async (req, res) => {
       try {
@@ -1605,6 +1604,28 @@ async function run() {
       res.send(result);
     });
 
+    // get teacher Role
+    app.get('/teachers/:email/role', async (req, res) => {
+      try {
+        const email = req.params.email;
+
+        if (!email) {
+          return res.status(400).send({ message: 'Email is required' });
+        }
+
+        const user = await staffCollection.findOne({ email });
+
+        if (!user) {
+          return res.status(404).send({ message: 'User not found' });
+        }
+
+        res.send({ role: user.role || 'user' });
+      } catch (error) {
+        console.error('Error getting user role:', error);
+        res.status(500).send({ message: 'Failed to get role' });
+      }
+    });
+
     // Get Teachers in Database
     app.get('/teachers', async (req, res) => {
       try {
@@ -1634,6 +1655,8 @@ async function run() {
             designation: teacher.designation || '-',
             indexno: teacher.indexno,
             gender: teacher.gender,
+            email: teacher.email,
+            role: teacher.role,
             subject: teacher.subject,
             phone: teacher.phone || '-',
             image: teacher.image || '/default-avatar.png',
