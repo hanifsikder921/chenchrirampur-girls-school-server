@@ -42,9 +42,273 @@ async function run() {
     const subjectCollection = db.collection('subjectJson');
 
     //=================================================================================================================
-  
 
-    // ===============================================================================================
+    // ===============================================================================================মার্ক ক্যালকুলেশন
+
+    // Add these endpoints to your backend
+
+    // Get teacher by email (for login purposes)
+    app.get('/teachers/email/:email', async (req, res) => {
+      try {
+        const { email } = req.params;
+
+        if (!email) {
+          return res.status(400).json({
+            success: false,
+            message: 'Email is required',
+          });
+        }
+
+        const teacher = await staffCollection.findOne({
+          email: email,
+          status: 'active', // assuming you have status field
+        });
+
+        if (!teacher) {
+          return res.status(404).json({
+            success: false,
+            message: 'Teacher not found',
+          });
+        }
+
+        res.status(200).json({
+          success: true,
+          data: teacher,
+        });
+      } catch (error) {
+        console.error('Error fetching teacher by email:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch teacher',
+          error: error.message,
+        });
+      }
+    });
+
+    // Get students by class and section (for AssignMark page)
+    app.get('/students/class/:className', async (req, res) => {
+      try {
+        const { className } = req.params;
+        const { section } = req.query;
+
+        if (!className) {
+          return res.status(400).json({
+            success: false,
+            message: 'Class name is required',
+          });
+        }
+
+        // Build filter
+        const filter = {
+          dclassName: className,
+          status: 'active',
+        };
+
+        // Add section filter for class 9 and 10
+        if (section && (className === '9' || className === '10')) {
+          filter.section = section;
+        }
+
+        const students = await studentCollection.find(filter).sort({ roll: 1 }).toArray();
+
+        res.status(200).json({
+          success: true,
+          data: students,
+        });
+      } catch (error) {
+        console.error('Error fetching students by class:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch students',
+          error: error.message,
+        });
+      }
+    });
+
+    // Get existing marks for a student (for pre-filling marks)
+    app.get('/marks/student', async (req, res) => {
+      try {
+        const { examType, examYear, classesName, roll, group } = req.query;
+
+        if (!examType || !examYear || !classesName || !roll) {
+          return res.status(400).json({
+            success: false,
+            message: 'examType, examYear, classesName, and roll are required',
+          });
+        }
+
+        const filter = {
+          examType,
+          examYear,
+          classesName,
+          roll,
+        };
+
+        if (group) {
+          filter.group = group;
+        }
+
+        const marks = await marksCollection.findOne(filter);
+
+        res.status(200).json({
+          success: true,
+          data: marks,
+        });
+      } catch (error) {
+        console.error('Error fetching existing marks:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch marks',
+          error: error.message,
+        });
+      }
+    });
+
+    // Update or insert marks (upsert functionality)
+    app.post('/marks/upsert', async (req, res) => {
+      try {
+        const { examType, classesName, roll, examYear, group, newSubject, newMark, newGrade } =
+          req.body;
+
+        if (!examType || !classesName || !roll || !examYear || !newSubject) {
+          return res.status(400).json({
+            success: false,
+            message: 'Required fields are missing',
+          });
+        }
+
+        // Find existing record
+        const filter = {
+          examType,
+          classesName,
+          roll,
+          examYear,
+          ...(group && { group }),
+        };
+
+        const existingRecord = await marksCollection.findOne(filter);
+
+        if (existingRecord) {
+          // Update existing record - add or update subject
+          const existingSubjectIndex = existingRecord.subjects.findIndex(
+            (sub) => sub.subject === newSubject
+          );
+
+          if (existingSubjectIndex >= 0) {
+            // Update existing subject
+            existingRecord.subjects[existingSubjectIndex].obtained = newMark;
+            existingRecord.subjects[existingSubjectIndex].grade = newGrade;
+          } else {
+            // Add new subject
+            existingRecord.subjects.push({
+              subject: newSubject,
+              fullMark: req.body.fullMark || 100,
+              obtained: newMark,
+              grade: newGrade,
+            });
+          }
+
+          // Recalculate CGPA
+          const cgpa = calculateCGPA(existingRecord.subjects);
+
+          const result = await marksCollection.updateOne(
+            { _id: existingRecord._id },
+            {
+              $set: {
+                subjects: existingRecord.subjects,
+                cgpa: cgpa,
+                updatedAt: new Date(),
+              },
+            }
+          );
+
+          res.status(200).json({
+            success: true,
+            message: 'Marks updated successfully',
+            data: result,
+          });
+        } else {
+          // Create new record
+          const newRecord = {
+            ...req.body,
+            subjects: [
+              {
+                subject: newSubject,
+                fullMark: req.body.fullMark || 100,
+                obtained: newMark,
+                grade: newGrade,
+              },
+            ],
+            cgpa: newGrade === 'F' ? 'F1' : getGradePoint(newGrade).toFixed(2),
+            date: new Date().toISOString(),
+          };
+
+          const result = await marksCollection.insertOne(newRecord);
+
+          res.status(201).json({
+            success: true,
+            message: 'Marks created successfully',
+            data: result,
+          });
+        }
+      } catch (error) {
+        console.error('Error upserting marks:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to save marks',
+          error: error.message,
+        });
+      }
+    });
+
+    // Helper functions for grade calculation
+    function getGrade(score, fullMark) {
+      const percentage = (score / fullMark) * 100;
+      if (percentage >= 80) return 'A+';
+      if (percentage >= 70) return 'A';
+      if (percentage >= 60) return 'A-';
+      if (percentage >= 50) return 'B';
+      if (percentage >= 40) return 'C';
+      if (percentage >= 33) return 'D';
+      return 'F';
+    }
+
+    function getGradePoint(grade) {
+      switch (grade) {
+        case 'A+':
+          return 5.0;
+        case 'A':
+          return 4.0;
+        case 'A-':
+          return 3.5;
+        case 'B':
+          return 3.0;
+        case 'C':
+          return 2.0;
+        case 'D':
+          return 1.0;
+        default:
+          return 0.0;
+      }
+    }
+
+    function calculateCGPA(subjects) {
+      let failCount = 0;
+      const points = subjects
+        .map((sub) => {
+          const grade = sub.grade;
+          if (grade === 'F') failCount += 1;
+          return getGradePoint(grade);
+        })
+        .filter((p) => p !== null);
+
+      if (failCount > 0) return `F${failCount}`;
+      if (points.length === 0) return '';
+      const gpa = points.reduce((sum, p) => sum + p, 0) / points.length;
+      return gpa.toFixed(2);
+    }
+
+    // ===============================================================================================মার্ক ক্যালকুলেশন
     // ===============================================================================================Subject Management==============>>
 
     // সব Subject ডেটা গেট করা
@@ -1673,10 +1937,13 @@ async function run() {
             email: teacher.email,
             role: teacher.role,
             subject: teacher.subject,
+            address: teacher.address,
+            dob: teacher.dob,
+            nid: teacher.nid,
             assignSubject: teacher.assignSubject,
             phone: teacher.phone || '-',
             image: teacher.image || '/default-avatar.png',
-            createdAt: teacher.createdAt, // Optional: include createdAt in response
+            createdAt: teacher.createdAt,
           })),
         });
       } catch (error) {
